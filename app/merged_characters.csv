@@ -1,0 +1,31 @@
+uid,name,url,height,mass,hair_color,skin_color,eye_color,birth_year,gender,homeworld_name,rotation_period,orbital_period,diameter,climate,gravity,terrain,surface_water,population
+1,Luke Skywalker,https://www.swapi.tech/api/people/1,172,77,blond,fair,blue,19BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+2,C-3PO,https://www.swapi.tech/api/people/2,167,75,n/a,gold,yellow,112BBY,n/a,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+3,R2-D2,https://www.swapi.tech/api/people/3,96,32,n/a,"white, blue",red,33BBY,n/a,Naboo,26,312,12120,temperate,1 standard,"grassy hills, swamps, forests, mountains",12,4500000000
+4,Darth Vader,https://www.swapi.tech/api/people/4,202,136,none,white,yellow,41.9BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+5,Leia Organa,https://www.swapi.tech/api/people/5,150,49,brown,light,brown,19BBY,female,Alderaan,24,364,12500,temperate,1 standard,"grasslands, mountains",40,2000000000
+6,Owen Lars,https://www.swapi.tech/api/people/6,178,120,"brown, grey",light,blue,52BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+7,Beru Whitesun lars,https://www.swapi.tech/api/people/7,165,75,brown,light,blue,47BBY,female,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+8,R5-D4,https://www.swapi.tech/api/people/8,97,32,n/a,"white, red",red,unknown,n/a,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+9,Biggs Darklighter,https://www.swapi.tech/api/people/9,183,84,black,light,brown,24BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+10,Obi-Wan Kenobi,https://www.swapi.tech/api/people/10,182,77,"auburn, white",fair,blue-gray,57BBY,male,Stewjon,unknown,unknown,0,temperate,1 standard,grass,unknown,unknown
+11,Anakin Skywalker,https://www.swapi.tech/api/people/11,188,84,blond,fair,blue,41.9BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
+12,Wilhuff Tarkin,https://www.swapi.tech/api/people/12,180,unknown,"auburn, grey",fair,blue,64BBY,male,Eriadu,24,360,13490,polluted,1 standard,cityscape,unknown,22000000000
+13,Chewbacca,https://www.swapi.tech/api/people/13,228,112,brown,unknown,blue,200BBY,male,Kashyyyk,26,381,12765,tropical,1 standard,"jungle, forests, lakes, rivers",60,45000000
+14,Han Solo,https://www.swapi.tech/api/people/14,180,80,brown,fair,brown,29BBY,male,Corellia,25,329,11000,temperate,1 standard,"plains, urban, hills, forests",70,3000000000
+15,Greedo,https://www.swapi.tech/api/people/15,173,74,n/a,green,black,44BBY,male,Rodia,29,305,7549,hot,1 standard,"jungles, oceans, urban, swamps",60,1300000000
+16,Jabba Desilijic Tiure,https://www.swapi.tech/api/people/16,175,"1,358",n/a,"green-tan, brown",orange,600BBY,hermaphrodite,Nal Hutta,87,413,12150,temperate,1 standard,"urban, oceans, swamps, bogs",unknown,7000000000
+18,Wedge Antilles,https://www.swapi.tech/api/people/18,170,77,brown,fair,hazel,21BBY,male,Corellia,25,329,11000,temperate,1 standard,"plains, urban, hills, forests",70,3000000000
+19,Jek Tono Porkins,https://www.swapi.tech/api/people/19,180,110,brown,fair,blue,unknown,male,Bestine IV,26,680,6400,temperate,unknown,"rocky islands, oceans",98,62000000
+20,Yoda,https://www.swapi.tech/api/people/20,66,17,white,green,brown,896BBY,male,unknown,0,0,0,unknown,unknown,unknown,unknown,unknown
+21,Palpatine,https://www.swapi.tech/api/people/21,170,75,grey,pale,yellow,82BBY,male,Naboo,26,312,12120,temperate,1 standard,"grassy hills, swamps, forests, mountains",12,4500000000
+22,Boba Fett,https://www.swapi.tech/api/people/22,183,78.2,black,fair,brown,31.5BBY,male,Kamino,27,463,19720,temperate,1 standard,ocean,100,1000000000
+23,IG-88,https://www.swapi.tech/api/people/23,200,140,none,metal,red,15BBY,none,unknown,0,0,0,unknown,unknown,unknown,unknown,unknown
+24,Bossk,https://www.swapi.tech/api/people/24,190,113,none,green,red,53BBY,male,Trandosha,25,371,0,arid,0.62 standard,"mountains, seas, grasslands, deserts",unknown,42000000
+25,Lando Calrissian,https://www.swapi.tech/api/people/25,177,79,black,dark,brown,31BBY,male,Socorro,20,326,0,arid,1 standard,"deserts, mountains",unknown,300000000
+26,Lobot,https://www.swapi.tech/api/people/26,175,79,none,light,blue,37BBY,male,Bespin,12,5110,118000,temperate,"1.5 (surface), 1 standard (Cloud City)",gas giant,0,6000000
+27,Ackbar,https://www.swapi.tech/api/people/27,180,83,none,brown mottle,orange,41BBY,male,Mon Cala,21,398,11030,temperate,1,"oceans, reefs, islands",100,27000000000
+28,Mon Mothma,https://www.swapi.tech/api/people/28,150,unknown,auburn,fair,blue,48BBY,female,Chandrila,20,368,13500,temperate,1,"plains, forests",40,1200000000
+29,Arvel Crynyd,https://www.swapi.tech/api/people/29,unknown,unknown,brown,fair,brown,unknown,male,unknown,0,0,0,unknown,unknown,unknown,unknown,unknown
+30,Wicket Systri Warrick,https://www.swapi.tech/api/people/30,88,20,brown,brown,brown,8BBY,male,Endor,18,402,4900,temperate,0.85 standard,"forests, mountains, lakes",8,30000000
+31,Nien Nunb,https://www.swapi.tech/api/people/31,160,68,none,grey,black,unknown,male,Sullust,20,263,12780,superheated,1,"mountains, volcanoes, rocky deserts",5,18500000000
