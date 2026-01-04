@@ -1,4 +1,4 @@
-uid,name,url,height,mass,hair_color,skin_color,eye_color,birth_year,gender,homeworld_name,rotation_period,orbital_period,diameter,climate,gravity,terrain,surface_water,population
+uid,character_name,url,height,mass,hair_color,skin_color,eye_color,birth_year,gender,homeworld_name,rotation_period,orbital_period,diameter,climate,gravity,terrain,surface_water,population
 1,Luke Skywalker,https://www.swapi.tech/api/people/1,172,77,blond,fair,blue,19BBY,male,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
 2,C-3PO,https://www.swapi.tech/api/people/2,167,75,n/a,gold,yellow,112BBY,n/a,Tatooine,23,304,10465,arid,1 standard,desert,1,200000
 3,R2-D2,https://www.swapi.tech/api/people/3,96,32,n/a,"white, blue",red,33BBY,n/a,Naboo,26,312,12120,temperate,1 standard,"grassy hills, swamps, forests, mountains",12,4500000000

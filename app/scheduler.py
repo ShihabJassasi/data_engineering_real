@@ -26,3 +26,4 @@ def stop_scheduler():
     if _scheduler.running:
         _scheduler.shutdown(wait=False)
         print("scheduler stopped")
+        
