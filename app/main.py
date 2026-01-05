@@ -1,44 +1,154 @@
-import csv
-import os
-from datetime import datetime
-
+import time
 import logging
-from app.logging_config import setup_logging
+from contextlib import asynccontextmanager
 
 import requests
 import uvicorn
 from fastapi import FastAPI, Request
-from contextlib import asynccontextmanager
+from sqlalchemy import text
 
-import time
-
+from app.logging_config import setup_logging
 from app.scheduler import start_scheduler, stop_scheduler
-
 from app.routers.characters import router as characters_router
 from app.routers.planets import router as planets_router
-
+from app.db import Base, engine
 
 setup_logging()
 logger = logging.getLogger("app")
+
+# API endpoints (using swapi.info)
+OLD_URL = "https://swapi.tech/api/people"
+NEW_URL = "https://swapi.info/api/people"
+
+# ✅ NEW: planets base endpoint
+PLANETS_URL = "https://swapi.info/api/planets"
+
+
+def safe_get_json(url: str, timeout: int = 20):
+    r = requests.get(url, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+
+def parse_people(data):
+    """
+    swapi.info may return a list directly, or a dict with results/result/people.
+    """
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        return data.get("results") or data.get("result") or data.get("people") or []
+    return []
+
+
+def extract_planet_id(homeworld_url: str) -> int | None:
+    """
+    Extracts the numeric planet id from a homeworld URL.
+    Example: https://swapi.info/api/planets/1 -> 1
+    """
+    if not homeworld_url:
+        return None
+    try:
+        return int(homeworld_url.rstrip("/").split("/")[-1])
+    except Exception:
+        return None
+
+
+# ✅ NEW: fetch planet details by planet_id
+def fetch_planet_by_id(planet_id: int) -> dict | None:
+    try:
+        url = f"{PLANETS_URL.rstrip('/')}/{planet_id}"
+        data = safe_get_json(url, timeout=20)
+
+        if isinstance(data, dict) and "result" in data and isinstance(data["result"], dict):
+            data = data["result"]
+
+        if not isinstance(data, dict):
+            return None
+
+        return {
+            "id": planet_id,
+            "name": data.get("name"),
+            "rotation_period": data.get("rotation_period"),
+            "orbital_period": data.get("orbital_period"),
+            "diameter": data.get("diameter"),
+            "climate": data.get("climate"),
+            "gravity": data.get("gravity"),
+            "terrain": data.get("terrain"),
+            "surface_water": data.get("surface_water"),
+            "population": data.get("population"),
+            "url": url,
+        }
+    except Exception as e:
+        logger.warning(f"PLANET_FETCH_FAIL: id={planet_id} error={e}")
+        return None
+
+
+
+# ✅ NEW: Upsert planets into DB so repeated planet_id stays same row (no duplicates)
+def upsert_planets(planet_ids: set[int]):
+    if not planet_ids:
+        return
+
+    planets_rows = []
+    for pid in sorted(planet_ids):
+        p = fetch_planet_by_id(pid)
+        if p and p.get("name"):
+            planets_rows.append(p)
+
+    if not planets_rows:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO planets
+                (id, name, rotation_period, orbital_period, diameter, climate, gravity, terrain, surface_water, population, url)
+                VALUES
+                (:id, :name, :rotation_period, :orbital_period, :diameter, :climate, :gravity, :terrain, :surface_water, :population, :url)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    rotation_period = EXCLUDED.rotation_period,
+                    orbital_period = EXCLUDED.orbital_period,
+                    diameter = EXCLUDED.diameter,
+                    climate = EXCLUDED.climate,
+                    gravity = EXCLUDED.gravity,
+                    terrain = EXCLUDED.terrain,
+                    surface_water = EXCLUDED.surface_water,
+                    population = EXCLUDED.population,
+                    url = EXCLUDED.url
+                """
+            ),
+            planets_rows,
+        )
+
+    logger.info(f"PLANETS_UPSERT_DONE: rows={len(planets_rows)}")
+
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("SYSTEM_STARTUP: FastAPI starting...")
+
+    # Ensure tables exist once at startup
+    Base.metadata.create_all(bind=engine)
+    logger.info("DB_READY: tables ensured")
+
+    # Start ETL scheduler
     start_scheduler(run_etl)
     logger.info("SCHEDULER_STARTED: ETL scheduler started")
+
     yield
+
+    # Stop scheduler on shutdown
     stop_scheduler()
     logger.info("SYSTEM_SHUTDOWN: FastAPI stopped")
 
 
-old_url = "https://swapi.tech/api/people"
-new_url = "https://swapi.info/api/people"
-home_world = "https://swapi.info/api/planets/1"
-
 app = FastAPI(lifespan=lifespan)
 
-# ✅ log every API call + errors
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.time()
@@ -64,159 +174,200 @@ app.include_router(planets_router)
 
 
 @app.get("/characters/old")
-def fetch_first30_old(limit=30):
+def fetch_first_old(limit: int = 30):
     """
-    Fetch first `limit` characters from swapi.tech (old API).
+    Old endpoint: returns uid + name + url.
+    swapi.info may not always provide uid, so we fallback to index.
     """
-    data = requests.get(
-        f"https://swapi.tech/api/people?page=1&limit={limit}"
-    ).json()
-    results1 = data.get("results", [])
-    characters_old = []
+    try:
+        data = safe_get_json(f"{OLD_URL}?page=1&limit={limit}")
+        people = parse_people(data)
+    except Exception as e:
+        logger.exception(f"OLD_API_FAIL: {e}")
+        return []
 
-    for person in results1:
-        characters_old.append({
-            "uid": person["uid"],
-            "character_name": person["name"],
-            "url": person["url"]
-        })
-
-    return characters_old
+    rows = []
+    for idx, p in enumerate(people, start=1):
+        rows.append(
+            {
+                "uid": str(p.get("uid") or idx),
+                "character_name": p.get("name"),
+                "url": p.get("url") or f"{OLD_URL.rstrip('/')}/{idx}",
+            }
+        )
+    return rows
 
 
 @app.get("/characters/new")
-def fetch_first30_new():
+def fetch_first_new(limit: int = 30):
     """
-    Fetch first `limit` characters from swapi.info (new API).
+    New endpoint: returns details.
     """
-    results2 = requests.get(new_url).json()
-    characters_new = []
+    try:
+        data = safe_get_json(NEW_URL)
+        people = parse_people(data)[:limit]
+    except Exception as e:
+        logger.exception(f"NEW_API_FAIL: {e}")
+        return []
 
-    for person in results2:
-        characters_new.append({
-            "character_name": person["name"],
-            "height": person["height"],
-            "mass": person["mass"],
-            "hair_color": person["hair_color"],
-            "skin_color": person["skin_color"],
-            "eye_color": person["eye_color"],
-            "birth_year": person["birth_year"],
-            "gender": person["gender"]
-        })
-
-    return characters_new
-
-
-def get_homeworld_first30():
-    """
-    For first `limit` people, fetch their homeworld data.
-    """
-    people_res = requests.get("https://swapi.info/api/people").json()
-
-    if isinstance(people_res, dict):
-        people = people_res.get("results", [])[:30]
-    else:
-        people = people_res[:30]
-
-    homeworld_list = []
-
+    rows = []
     for p in people:
-        planet = requests.get(p["homeworld"]).json()
+        rows.append(
+            {
+                "character_name": p.get("name"),
+                "height": p.get("height"),
+                "mass": p.get("mass"),
+                "hair_color": p.get("hair_color"),
+                "skin_color": p.get("skin_color"),
+                "eye_color": p.get("eye_color"),
+                "birth_year": p.get("birth_year"),
+                "homeworld": p.get("homeworld"),
+            }
+        )
+    return rows
 
-        homeworld_list.append({
-            "character": p["name"],
-            "name": planet.get("name"),
-            "rotation_period": planet.get("rotation_period"),
-            "orbital_period": planet.get("orbital_period"),
-            "diameter": planet.get("diameter"),
-            "climate": planet.get("climate"),
-            "gravity": planet.get("gravity"),
-            "terrain": planet.get("terrain"),
-            "surface_water": planet.get("surface_water"),
-            "population": planet.get("population"),
-        })
 
-    return {
-        "count": len(homeworld_list),
-        "data": homeworld_list
-    }
+def get_homeworld_for_people(people: list[dict]):
+    """
+    Returns a dict: normalized_name -> planet_id
+    """
+    out = {}
+    for p in people:
+        name = (p.get("character_name") or "").strip().lower()
+        hw = p.get("homeworld")
+        if name:
+            out[name] = extract_planet_id(hw)
+    return out
+
+
+def load_to_db(rows: list[dict], truncate_first: bool = True):
+    """
+    Loads merged rows directly into merged_characters table.
+    """
+    if not rows:
+        logger.warning("DB_LOAD_SKIPPED: rows=0")
+        return
+
+    logger.info(f"DB_LOAD_START: rows={len(rows)} truncate={truncate_first}")
+
+    with engine.begin() as conn:
+        if truncate_first:
+            conn.execute(text("TRUNCATE TABLE merged_characters RESTART IDENTITY"))
+
+        conn.execute(
+            text(
+                """
+                INSERT INTO merged_characters
+                (uid, character_name, url, height, mass, hair_color, skin_color, eye_color, birth_year, planet_id)
+                VALUES
+                (:uid, :character_name, :url, :height, :mass, :hair_color, :skin_color, :eye_color, :birth_year, :planet_id)
+                """
+            ),
+            rows,
+        )
+
+        cnt = conn.execute(text("select count(*) from merged_characters")).scalar()
+        logger.info(f"DB_LOAD_DONE: count_now={cnt}")
+
+
+def to_int_or_none(value):
+    """
+    Convert values like '172' -> 172, and 'unknown'/'n/a'/None -> None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+
+    s = str(value).strip().lower()
+    if s in ("", "unknown", "n/a", "none", "null"):
+        return None
+
+    s = s.replace(",", "")
+    try:
+        return int(float(s))
+    except Exception:
+        return None
 
 
 def run_etl(limit: int = 30):
     """
-    Merge:
-    - old API (uid, name, url)
-    - new API (details)
-    - homeworld data
-    Then save to CSV.
+    ETL:
+    - Fetch old + new
+    - Merge by name
+    - Extract planet_id from homeworld
+    - Upsert planets table by planet_id (no duplicates)
+    - Write merged_characters to PostgreSQL
     """
     logger.info(f"ETL_START: limit={limit}")
 
     try:
-        old_30 = fetch_first30_old(limit=30)
-        new_30 = fetch_first30_new()
-        homeworld_res = get_homeworld_first30()
-        hw_list = homeworld_res.get("data", [])
+        old_rows = fetch_first_old(limit=limit)
+        new_rows = fetch_first_new(limit=limit)
 
-        homeworld_by_name = {hw.get("character"): hw for hw in hw_list}
+        if not old_rows:
+            logger.warning("ETL_ABORT: old_rows=0 (skipping DB write)")
+            return {"count": 0, "loaded_to_db": False, "message": "old API returned 0"}
+
+        if not new_rows:
+            logger.warning("ETL_ABORT: new_rows=0 (skipping DB write)")
+            return {"count": 0, "loaded_to_db": False, "message": "new API returned 0"}
+
+        # Map new rows by normalized name
+        new_by_name = {}
+        for r in new_rows:
+            key = (r.get("character_name") or "").strip().lower()
+            if key:
+                new_by_name[key] = r
+
+        # Planet id by normalized name
+        planet_id_by_name = get_homeworld_for_people(new_rows)
+
+        # ✅ NEW: collect unique planet ids then upsert planets table
+        unique_planet_ids = {pid for pid in planet_id_by_name.values() if isinstance(pid, int)}
+        upsert_planets(unique_planet_ids)
 
         merged = []
-        for old, new in zip(old_30, new_30):
-            person = {}
-            person.update(old)
-            person.update(new)
+        for o in old_rows:
+            name = o.get("character_name")
+            key = (name or "").strip().lower()
+            n = new_by_name.get(key, {}) or {}
 
-            hw = homeworld_by_name.get(person.get("character_name"), {}) or {}
-
-            person.pop("homeworld", None)
-
-            person["homeworld_name"] = hw.get("name")
-            person["rotation_period"] = hw.get("rotation_period")
-            person["orbital_period"] = hw.get("orbital_period")
-            person["diameter"] = hw.get("diameter")
-            person["climate"] = hw.get("climate")
-            person["gravity"] = hw.get("gravity")
-            person["terrain"] = hw.get("terrain")
-            person["surface_water"] = hw.get("surface_water")
-            person["population"] = hw.get("population")
-
-            merged.append(person)
+            merged.append(
+                {
+                    "uid": o.get("uid"),
+                    "character_name": name,
+                    "url": o.get("url") or n.get("url"),
+                    "height": to_int_or_none(n.get("height")),
+                    "mass": to_int_or_none(n.get("mass")),
+                    "hair_color": n.get("hair_color"),
+                    "skin_color": n.get("skin_color"),
+                    "eye_color": n.get("eye_color"),
+                    "birth_year": n.get("birth_year"),
+                    "planet_id": planet_id_by_name.get(key),
+                }
+            )
 
         if not merged:
             logger.warning("ETL_EMPTY: No data merged")
-            return {"count": 0, "data": [], "message": "No data merged"}
+            return {"count": 0, "loaded_to_db": False, "message": "No data merged"}
 
-        filename = "merged_characters.csv"
+        load_to_db(merged, truncate_first=True)
 
-        BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # project root
-        data_dir = os.path.join(BASE_DIR, "data")
-        os.makedirs(data_dir, exist_ok=True)
-
-        file_path = os.path.join(data_dir, filename)
-        tmp_path = file_path + ".tmp"
-
-        with open(tmp_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=list(merged[0].keys()))
-            writer.writeheader()
-            writer.writerows(merged)
-
-        if os.path.exists(tmp_path):
-            os.replace(tmp_path, file_path)
-            logger.info(f"ETL_SUCCESS: rows={len(merged)} file={file_path}")
-        else:
-            logger.warning(f"ETL_WARN: TMP file not created file={file_path}")
-            return {"count": len(merged), "message": "TMP file not created", "file": file_path, "data": merged}
-
-        return {"count": len(merged), "file": file_path, "data": merged}
+        logger.info(f"DB_LOAD_SUCCESS: rows={len(merged)}")
+        return {"count": len(merged), "loaded_to_db": True}
 
     except Exception as e:
         logger.exception(f"ETL_FAIL: error={e}")
-        return {"count": 0, "error": str(e)}
+        return {"count": 0, "loaded_to_db": False, "error": str(e)}
 
 
 @app.get("/characters/merged")
-def fetch_merged_characters():
-    return run_etl()
+def fetch_merged_characters(limit: int = 30):
+    """
+    Manual ETL trigger (also writes to DB).
+    """
+    return run_etl(limit=limit)
 
 
 if __name__ == "__main__":
