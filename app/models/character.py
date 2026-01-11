@@ -1,4 +1,5 @@
-from sqlalchemy import BigInteger, Column, Integer, String
+from sqlalchemy import BigInteger, Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from app.db import Base
 
 class Character(Base):
@@ -14,5 +15,7 @@ class Character(Base):
     skin_color = Column(String)
     eye_color = Column(String)
     birth_year = Column(String)
-    planet_id = Column(Integer)
+
+    planet_id = Column(Integer, ForeignKey("planets.id"), nullable=True)
+    planet = relationship("Planet", back_populates="characters")
 

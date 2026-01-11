@@ -1185,3 +1185,4 @@ FROM merged_characters]
 2026-01-04 12:11:39,108 | INFO | apscheduler.executors.default | Job "run_etl (trigger: interval[0:01:00], next run at: 2026-01-04 12:12:35 UTC)" executed successfully
 2026-01-04 12:11:58,310 | INFO | apscheduler.scheduler | Scheduler has been shut down
 2026-01-04 12:11:58,322 | INFO | app | SYSTEM_SHUTDOWN: FastAPI stopped
+2026-01-11 14:36:17,305 | INFO | app | SYSTEM_STARTUP: FastAPI starting...
